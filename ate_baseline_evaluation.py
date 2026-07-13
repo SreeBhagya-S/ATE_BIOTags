@@ -128,6 +128,7 @@ def run_baseline(model_name, baseline_name):
     output_dir="./results/your_model",
     per_device_train_batch_size=8,
     per_device_eval_batch_size=8,
+    learning_rate=5e-5,
     num_train_epochs=50,
     logging_dir="./logs",
     evaluation_strategy="epoch",
@@ -137,8 +138,7 @@ def run_baseline(model_name, baseline_name):
     greater_is_better=False,
     save_total_limit=2,
     report_to="none"
-    )
-
+)
     trainer = Trainer(
     model=model,
     args=args,
