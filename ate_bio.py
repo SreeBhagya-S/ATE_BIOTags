@@ -219,7 +219,7 @@ dataset = AspectSentimentDataset(df, tokenizer, label2id, max_len=128)
 
 import pandas as pd
 import torch
-from transformers import BertTokenizer, BertModel
+
 from sklearn.cluster import KMeans
 from nltk import pos_tag
 from nltk.tokenize import word_tokenize
@@ -232,12 +232,14 @@ nltk.download('punkt_tab')
 df = pd.read_csv("/content/drive/MyDrive/PHD_Corpus/Balanced_CM.csv")  # Make sure this has a 'Review_Text' column
 texts = df['Review_Text'].tolist()
 
-# Step 2: Load Multilingual BERT
-tokenizer = BertTokenizer.from_pretrained("bert-base-multilingual-cased")
-model = BertModel.from_pretrained("bert-base-multilingual-cased")
+# Step 2: Load Model and 
+tokenizer = PreTrainedTokenizerFast(tokenizer_file="/content/drive/MyDrive/PHD_Corpus/tokenizer.json")
+if tokenizer.pad_token is None:
+    tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+model = TransformerEncoderModel(config).to(device)
 
-# Step 3: Extract BERT Embeddings
-def get_bert_embeddings(text, max_length=512):
+# Step 3: Extract  Embeddings
+def extract_embeddings(text, max_length=512):
     tokens = tokenizer.tokenize(text)
     tokens = tokens[:max_length - 2]  # Ensure within limit
     input_ids = tokenizer.encode(tokens, return_tensors='pt', truncation=True, max_length=max_length, add_special_tokens=True)
@@ -252,7 +254,7 @@ all_tokens = []
 all_embeddings = []
 
 for review in texts:
-    tokens, embeddings = get_bert_embeddings(review)
+    tokens, embeddings = extract_embeddings(review)
     for tok, emb in zip(tokens, embeddings):
         if tok.startswith('##'): continue  # Skip subwords
         all_tokens.append(tok)
@@ -494,8 +496,7 @@ import string
 STOPWORDS = load_stopwords('/content/merged_stopwords.txt')
 PUNCTUATIONS = set(string.punctuation)
 
-# Load mBERT tokenizer
-tokenizer = BertTokenizer.from_pretrained("bert-base-multilingual-cased")
+# Load  tokenizer
 SPECIAL_TOKEN_IDS = set(tokenizer.convert_tokens_to_ids(token) for token in tokenizer.all_special_tokens)
 
 SPECIAL_TOKENS = set(tokenizer.all_special_tokens)
@@ -658,11 +659,6 @@ def extract_aspect_terms(text):
             final_output[aspect] = sorted(aspect_hits[aspect]) if aspect_hits[aspect] else [aspect]
 
     return final_output, tokenlist
-
-from transformers import BertForTokenClassification
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model_name = "bert-base-multilingual-cased"
-model = BertForTokenClassification.from_pretrained(model_name).to(device)
 
 sample_review = "ഞാൻ ആദ്യമായി ഒരു apple product വാങ്ങി. Apple productsil value for money എന്ന് തോന്നിയ ഒരേ ഒരു സാധനം..Ipad Air 5 with M1 processor. 50k..iOS nu ഒരുപാട് limitation ഉണ്ടെന്നു മനസിലായി."
 tokens_review = word_tokenize(sample_review)
@@ -1308,7 +1304,7 @@ for i in range(28924,len(df)):
 
 import pandas as pd
 import torch
-from transformers import BertTokenizer, BertModel, pipeline
+from transformers  pipeline
 from indic_transliteration import sanscript
 from indic_transliteration.sanscript import transliterate
 from sklearn.cluster import KMeans
@@ -1323,9 +1319,6 @@ df = pd.read_csv("/content/drive/MyDrive/PHD_Corpus/Balanced_CM.csv")  # Make su
 # Load spaCy model for POS tagging and dependency parsing
 nlp = spacy.load('en_core_web_sm')  # English model for demonstration
 
-# Load pretrained multilingual BERT and tokenizer
-tokenizer = BertTokenizer.from_pretrained("bert-base-multilingual-cased")
-model = BertModel.from_pretrained("bert-base-multilingual-cased")
 model.eval()
 
 # Load NER pipeline (can use multilingual or fine-tuned model if available)
@@ -1347,7 +1340,7 @@ def preprocess_text(text):
     text = text.lower()
     return text
 
-# Step 2: WordPiece Tokenization using BERT tokenizer
+# Step 2: WordPiece Tokenization using tokenizer
 def tokenize_text(text, max_length=512):
     tokens = tokenizer.tokenize(text)
     tokens = tokens[:max_length - 2]
@@ -1375,7 +1368,7 @@ def lexical_semantic_lookup(token):
     return lemmas
 
 # Step 6: Extract embeddings from pre-trained multilingual transformer
-def get_bert_embeddings(text, max_length=512):
+def get_embeddings(text, max_length=512):
     tokens, input_ids = tokenize_text(text, max_length)
     with torch.no_grad():
         outputs = model(input_ids)
@@ -1389,7 +1382,7 @@ def extract_aspect_terms(texts, n_clusters=50):
 
     for review in texts:
         preprocessed_text = preprocess_text(review)
-        tokens, embeddings = get_bert_embeddings(preprocessed_text)
+        tokens, embeddings = get_embeddings(preprocessed_text)
         for tok, emb in zip(tokens, embeddings):
             if tok.startswith('##'):  # skip subwords for clustering
                 continue
