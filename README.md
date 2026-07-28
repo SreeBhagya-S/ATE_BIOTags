@@ -1,8 +1,6 @@
 # ATE_BIOTags
 
 # Annotation Guideline for Category-Specific BIO Aspect Tagging
-### Malayalam–English Code-Mixed Product Review Corpus
-
 ---
 
 ## 1. Purpose
