@@ -38,7 +38,7 @@ Categories are derived from the 650-term bilingual Malayalam–English aspect le
 | `network` | Connectivity, signal, SIM, Wi-Fi | network, signal, SIM, Wi-Fi, 5G | നെറ്റ്‌വർക്ക്, സിഗ്നൽ |
 | `phone` | Whole-device / general product mentions (brand or model name used as the aspect target itself, not a specific sub-component) | phone, mobile, iPhone, device | ഫോൺ, മൊബൈൽ |
 
-> **Note:** This table lists the primary categories named in the lexicon description. Annotators must consult the full 650-term lexicon file for the authoritative category assignment of any specific term, and must not introduce new category tags without consulting the lexicon maintainers — this keeps the tag inventory closed and consistent with the downstream sentiment-analysis category set.
+
 
 ---
 
