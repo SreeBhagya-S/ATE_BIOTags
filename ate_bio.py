@@ -27,151 +27,151 @@ from nltk.tokenize import ToktokTokenizer
 #  Modify the Model for Classification
 import torch.nn as nn
 
-class TransformerEncoderLayerWithAttn(nn.Module):
-    def __init__(self, d_model, nhead, dim_feedforward, dropout=0.1):
-        super().__init__()
-        self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout, batch_first=True)
-        self.linear1 = nn.Linear(d_model, dim_feedforward)
-        self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_feedforward, d_model)
+# class TransformerEncoderLayerWithAttn(nn.Module):
+#     def __init__(self, d_model, nhead, dim_feedforward, dropout=0.1):
+#         super().__init__()
+#         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout, batch_first=True)
+#         self.linear1 = nn.Linear(d_model, dim_feedforward)
+#         self.dropout = nn.Dropout(dropout)
+#         self.linear2 = nn.Linear(dim_feedforward, d_model)
 
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
-        self.activation = nn.ReLU()
-
-
-    def forward(self, src, attention_mask=None):
-        key_padding_mask = None
-        if attention_mask is not None:
-            key_padding_mask = attention_mask == 0  # mask where attention_mask is 0 (padding)
-
-        attn_output, attn_weights = self.self_attn(
-            src, src, src, key_padding_mask=key_padding_mask, need_weights=True
-        )
-        src2 = self.norm1(src + self.dropout1(attn_output))
-        ff_output = self.linear2(self.dropout(self.activation(self.linear1(src2))))
-        src2 = self.norm2(src2 + self.dropout2(ff_output))
-        return src2, attn_weights
+#         self.norm1 = nn.LayerNorm(d_model)
+#         self.norm2 = nn.LayerNorm(d_model)
+#         self.dropout1 = nn.Dropout(dropout)
+#         self.dropout2 = nn.Dropout(dropout)
+#         self.activation = nn.ReLU()
 
 
+#     def forward(self, src, attention_mask=None):
+#         key_padding_mask = None
+#         if attention_mask is not None:
+#             key_padding_mask = attention_mask == 0  # mask where attention_mask is 0 (padding)
 
-class TransformerEncoderModel(nn.Module):
-    def __init__(self, config):
-        super(TransformerEncoderModel, self).__init__()
-        self.embedding = nn.Embedding(config.vocab_size, config.d_model)
-        self.transformer_layers = nn.ModuleList([
-        TransformerEncoderLayerWithAttn(config.d_model, config.nhead, config.dim_feedforward, dropout=0.2)
-        for _ in range(config.num_layers)
-        ])
-        self.fc = nn.Linear(config.d_model, config.vocab_size)  # MLM Head
-        self.nsp_fc = nn.Linear(config.d_model, 2)  # NSP Head
-        self.dropout = nn.Dropout(0.1)
-        self.max_seq_length = config.max_seq_length
-        self.output_hidden_states = config.output_hidden_states  
-        self.absa_fc = nn.Linear(config.d_model, config.num_absa_classes)
+#         attn_output, attn_weights = self.self_attn(
+#             src, src, src, key_padding_mask=key_padding_mask, need_weights=True
+#         )
+#         src2 = self.norm1(src + self.dropout1(attn_output))
+#         ff_output = self.linear2(self.dropout(self.activation(self.linear1(src2))))
+#         src2 = self.norm2(src2 + self.dropout2(ff_output))
+#         return src2, attn_weights
 
 
 
-    def forward(self, src, attention_mask=None, return_hidden_states=None, return_attentions=False):
-        if return_hidden_states is None:
-            return_hidden_states = self.output_hidden_states
-
-        src = self.embedding(src) * (self.max_seq_length ** 0.5)
-        src = self.dropout(src)
-
-        attention_weights = []
-        hidden_states = []
-
-        x = src
-        for layer in self.transformer_layers:
-            x, attn = layer(x, attention_mask=attention_mask)
-            if return_hidden_states:
-                hidden_states.append(x)
-            if return_attentions:
-                attention_weights.append(attn)
-
-        output = x  # Final output from last layer
-        mlm_output = self.fc(output)
-        cls_token = output[:, 0, :]  # CLS for NSP
-        nsp_output = self.nsp_fc(cls_token)
-
-        results = [mlm_output, nsp_output]
-        if return_hidden_states:
-            results.append(output)
-        if return_attentions:
-            results.append(attention_weights)
-
-        absa_logits = self.absa_fc(output[:, 0, :])  # [CLS] token
-        results.append(absa_logits)
-
-        return tuple(results)
+# class TransformerEncoderModel(nn.Module):
+#     def __init__(self, config):
+#         super(TransformerEncoderModel, self).__init__()
+#         self.embedding = nn.Embedding(config.vocab_size, config.d_model)
+#         self.transformer_layers = nn.ModuleList([
+#         TransformerEncoderLayerWithAttn(config.d_model, config.nhead, config.dim_feedforward, dropout=0.2)
+#         for _ in range(config.num_layers)
+#         ])
+#         self.fc = nn.Linear(config.d_model, config.vocab_size)  # MLM Head
+#         self.nsp_fc = nn.Linear(config.d_model, 2)  # NSP Head
+#         self.dropout = nn.Dropout(0.1)
+#         self.max_seq_length = config.max_seq_length
+#         self.output_hidden_states = config.output_hidden_states  
+#         self.absa_fc = nn.Linear(config.d_model, config.num_absa_classes)
 
 
-    def extract_embeddings(self, src, output_hidden_states=False):
-        """Returns word embeddings, contextualized embeddings, and sentence embeddings."""
-        with torch.no_grad():
-            word_embeddings = self.embedding(src)
-            word_embeddings = self.dropout(word_embeddings)
 
-            transformer_input = word_embeddings.permute(1, 0, 2)
-            hidden_states = []
-            x = transformer_input
-            for layer in self.transformer_encoder.layers:
-                x = layer(x)
-                if output_hidden_states:
-                    hidden_states.append(x.permute(1, 0, 2))
-            x = x.permute(1, 0, 2)
-            sentence_embeddings = x[:, 0, :]
+#     def forward(self, src, attention_mask=None, return_hidden_states=None, return_attentions=False):
+#         if return_hidden_states is None:
+#             return_hidden_states = self.output_hidden_states
 
-        if output_hidden_states:
-            return word_embeddings, x, sentence_embeddings, hidden_states
-        return word_embeddings, x, sentence_embeddings
+#         src = self.embedding(src) * (self.max_seq_length ** 0.5)
+#         src = self.dropout(src)
 
-class TransformerConfig:
-    def __init__(self, vocab_size, d_model, nhead, num_layers, dim_feedforward, max_seq_length, output_hidden_states=True, num_absa_classes=3):
-        self.vocab_size = vocab_size
-        self.d_model = d_model
-        self.nhead = nhead
-        self.num_layers = num_layers
-        self.dim_feedforward = dim_feedforward
-        self.max_seq_length = max_seq_length
-        self.output_hidden_states = output_hidden_states
-        self.num_absa_classes = num_absa_classes 
+#         attention_weights = []
+#         hidden_states = []
 
-    @classmethod
-    def from_pretrained(cls, config_path):
-        with open(config_path, "r") as f:
-            config_dict = json.load(f)
-        return cls(**config_dict)
+#         x = src
+#         for layer in self.transformer_layers:
+#             x, attn = layer(x, attention_mask=attention_mask)
+#             if return_hidden_states:
+#                 hidden_states.append(x)
+#             if return_attentions:
+#                 attention_weights.append(attn)
 
-config_path = "/content/drive/MyDrive/PHD_Corpus/7Jan_model_V2_config_14l_8BS_512SQ_100E_LR1e-4_TS25_RS5/7Jan_config_V2_14l_8BS_512SQ_100E_LR1e-4_TS25_RS5_12AH.json"
-config = TransformerConfig.from_pretrained(config_path)
-config.num_absa_classes = 5  # or 5, based on your task
+#         output = x  # Final output from last layer
+#         mlm_output = self.fc(output)
+#         cls_token = output[:, 0, :]  # CLS for NSP
+#         nsp_output = self.nsp_fc(cls_token)
 
-model = TransformerEncoderModel(config)
+#         results = [mlm_output, nsp_output]
+#         if return_hidden_states:
+#             results.append(output)
+#         if return_attentions:
+#             results.append(attention_weights)
+
+#         absa_logits = self.absa_fc(output[:, 0, :])  # [CLS] token
+#         results.append(absa_logits)
+
+#         return tuple(results)
 
 
-print(model)
+#     def extract_embeddings(self, src, output_hidden_states=False):
+#         """Returns word embeddings, contextualized embeddings, and sentence embeddings."""
+#         with torch.no_grad():
+#             word_embeddings = self.embedding(src)
+#             word_embeddings = self.dropout(word_embeddings)
+
+#             transformer_input = word_embeddings.permute(1, 0, 2)
+#             hidden_states = []
+#             x = transformer_input
+#             for layer in self.transformer_encoder.layers:
+#                 x = layer(x)
+#                 if output_hidden_states:
+#                     hidden_states.append(x.permute(1, 0, 2))
+#             x = x.permute(1, 0, 2)
+#             sentence_embeddings = x[:, 0, :]
+
+#         if output_hidden_states:
+#             return word_embeddings, x, sentence_embeddings, hidden_states
+#         return word_embeddings, x, sentence_embeddings
+
+# class TransformerConfig:
+#     def __init__(self, vocab_size, d_model, nhead, num_layers, dim_feedforward, max_seq_length, output_hidden_states=True, num_absa_classes=3):
+#         self.vocab_size = vocab_size
+#         self.d_model = d_model
+#         self.nhead = nhead
+#         self.num_layers = num_layers
+#         self.dim_feedforward = dim_feedforward
+#         self.max_seq_length = max_seq_length
+#         self.output_hidden_states = output_hidden_states
+#         self.num_absa_classes = num_absa_classes 
+
+#     @classmethod
+#     def from_pretrained(cls, config_path):
+#         with open(config_path, "r") as f:
+#             config_dict = json.load(f)
+#         return cls(**config_dict)
+
+# config_path = "/content/drive/MyDrive/PHD_Corpus/7Jan_model_V2_config_14l_8BS_512SQ_100E_LR1e-4_TS25_RS5/7Jan_config_V2_14l_8BS_512SQ_100E_LR1e-4_TS25_RS5_12AH.json"
+# config = TransformerConfig.from_pretrained(config_path)
+# config.num_absa_classes = 5  # or 5, based on your task
+
+# model = TransformerEncoderModel(config)
 
 
-from transformers import PreTrainedTokenizerFast
+# print(model)
 
-tokenizer = PreTrainedTokenizerFast(tokenizer_file="/content/drive/MyDrive/PHD_Corpus/tokenizer.json")
-if tokenizer.pad_token is None:
-    tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
-# Load config and model
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device,"alloted..............................................")
-model = TransformerEncoderModel(config).to(device)
+# from transformers import PreTrainedTokenizerFast
 
-# Load MLM checkpoint (trained on MLM+NSP)
-checkpoint_path = "/content/drive/MyDrive/PHD_Corpus/7Jan_checkpoint.pth"
-checkpoint = torch.load(checkpoint_path, map_location=device,weights_only=False)
-model.load_state_dict(checkpoint['model_state_dict'], strict=False)
-model.eval()
+# tokenizer = PreTrainedTokenizerFast(tokenizer_file="/content/drive/MyDrive/PHD_Corpus/tokenizer.json")
+# if tokenizer.pad_token is None:
+#     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+
+# # Load config and model
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# print(device,"alloted..............................................")
+# model = TransformerEncoderModel(config).to(device)
+
+# # Load MLM checkpoint (trained on MLM+NSP)
+# checkpoint_path = "/content/drive/MyDrive/PHD_Corpus/7Jan_checkpoint.pth"
+# checkpoint = torch.load(checkpoint_path, map_location=device,weights_only=False)
+# model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+# model.eval()
 
 from torch.utils.data import DataLoader
 import torch
@@ -185,32 +185,32 @@ model.eval()
 
 from torch.utils.data import Dataset
 
-class AspectSentimentDataset(Dataset):
-    def __init__(self, df, tokenizer, label2id, max_len=128):
-        self.tokenizer = tokenizer
-        self.texts = df['Review_Text']
-        self.aspects = df['Aspect_Term']
-        self.categories = df['Aspect_Category']
-        self.labels = df['Sentiment_Class'].map(label2id)
-        self.max_len = max_len
+# class AspectSentimentDataset(Dataset):
+#     def __init__(self, df, tokenizer, label2id, max_len=128):
+#         self.tokenizer = tokenizer
+#         self.texts = df['Review_Text']
+#         self.aspects = df['Aspect_Term']
+#         self.categories = df['Aspect_Category']
+#         self.labels = df['Sentiment_Class'].map(label2id)
+#         self.max_len = max_len
 
-    def __len__(self):
-        return len(self.texts)
+#     def __len__(self):
+#         return len(self.texts)
 
-    def __getitem__(self, idx):
-        text = f"{self.texts.iloc[idx]} [ASP] {self.aspects.iloc[idx]} [CAT] {self.categories.iloc[idx]}"
-        encoded = self.tokenizer(
-            text, max_length=self.max_len, padding='max_length', truncation=True, return_tensors='pt'
-        )
-        return (
-            encoded['input_ids'].squeeze(),
-            encoded['attention_mask'].squeeze(),
-            torch.tensor(self.labels.iloc[idx])
-        )
+#     def __getitem__(self, idx):
+#         text = f"{self.texts.iloc[idx]} [ASP] {self.aspects.iloc[idx]} [CAT] {self.categories.iloc[idx]}"
+#         encoded = self.tokenizer(
+#             text, max_length=self.max_len, padding='max_length', truncation=True, return_tensors='pt'
+#         )
+#         return (
+#             encoded['input_ids'].squeeze(),
+#             encoded['attention_mask'].squeeze(),
+#             torch.tensor(self.labels.iloc[idx])
+#         )
 
-from torch.utils.data import DataLoader, random_split
+# from torch.utils.data import DataLoader, random_split
 
-dataset = AspectSentimentDataset(df, tokenizer, label2id, max_len=128)
+# dataset = AspectSentimentDataset(df, tokenizer, label2id, max_len=128)
 
 
 """**BIO Tagging**"""
