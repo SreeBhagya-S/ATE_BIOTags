@@ -12,7 +12,7 @@ import numpy as np
 import torch
 
 # Load your dataset
-df = pd.read_csv("/home/labadmin/SMT/ATE_bio_tagged_output.csv")
+df = pd.read_csv("/home/labadmin/SMT/Evaluation.csv")
 df['tokens'] = df['Word_Tokens'].apply(ast.literal_eval)
 df['labels'] = df['BIO_Tags'].apply(ast.literal_eval)
 
